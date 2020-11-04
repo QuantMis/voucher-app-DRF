@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <title>
+        Voucher Application
+    </title>
+
+    <!-- <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet" /> -->
+    <!-- <link href="https://use.fontawesome.com/releases/v5.0.6/css/all.css" rel="stylesheet"> -->
+    <link href="css/bootstrap.css" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.12/dist/vue.js"></script>
+    <script src="js/bootstrap.js"></script>
+
+</head>
+
+<body class="">
+    <div id="app">
+        <div class="container">
+            <nav class="navbar navbar-default">
+                <div class="container-fluid">
+                    <div class="navbar-header">
+                        <a class="navbar-brand" href="#">Voucher App</a>
+                    </div>
+                </div>
+            </nav>
+            <div class="container">
+                <h3>Products</h3>
+                <p>List of available products</p>
+                <ul class="list-group" v-bind:key="product.id" v-for="product in products">
+                    <li class="list-group-item">{{product.title}} RM:{{product.price}}<button
+                            v-on:click="postOrder(product)">Buy</button></li>
+                </ul>
+            </div>
+
+            <div class="container">
+                <h3>My Orders</h3>
+                <button v-on:click="deleteAllOrder()">Reset CART</button>
+                <div class="empty-cart" v-if="orders.length == 0">
+                    <li class="list-group-item">No Order Yet!</li>
+                </div>
+                <div class="not-empty-cart" v-else>
+                    <ul class="list-group" v-bind:key="order.id" v-for="order in orders">
+                        <li class="list-group-item">{{order.title}} RM:{{order.price}}<button
+                                v-on:click="deleteOrder(order)">Remove</button></li>
+                    </ul>
+                    <p>Subtotal: {{stotal}}</p>
+                    <p>Processing Fee: {{fee}}</p>
+                    <p>Grand Total: {{gtotal}}</p>
+                    <button v-on:click="unstageVoucher()">remove voucher</button>
+                    <button v-on:click="submitOrder()">confirm</button>
+                </div>
+            </div>
+            <div class="container">
+                <p>Available Vouchers</p>
+                <div class="card" style="width: 15rem;" v-bind:key="voucher.id" v-for="voucher in vouchers">
+                    <div class="card-body">
+                        <h5 class="card-title">{{voucher.title}}</h5>
+                        <h3 class="card-text">{{voucher.capacity}} Usage</h3>
+                        <p class="card-text">{{voucher.description}}</p>
+                        <a class="btn btn-primary" v-on:click="stageVoucher(voucher)">Apply Voucher</a>
+                    </div>
+                </div>
+            </div>
+            <div class="container">
+                <p>Order History</p>
+                <ul class="list-group" v-bind:key="history.id" v-for="history in histories">
+                    <li class="list-group-item">{{history.orders}} RM:{{history.payout}} date: {{history.date}}</li>
+                </ul>
+            </div>
+
+        </div>
+
+
+
+    </div>
+
+
+    <script>
+        var vm = new Vue({
+            el: "#app",
+            data: {
+                products: [],
+                vouchers: [],
+                orders: [],
+                histories: [],
+                gtotal: 0,
+                stotal: 0,
+                fee: 25
+            }
+            ,
+            methods: {
+                // endpoint method
+                getProduct() {
+                    $.ajax({
+                        url: "http://127.0.0.1:8000/api/product/",
+                        cache: false,
+                        success: function (data) {
+                            for (var i = 0; i < data.length; i++) {
+                                Vue.set(vm.products, i, data[i])
+                            }
+                        }
+                    })
+                },
+                getVoucher() {
+                    $.ajax({
+                        url: "http://127.0.0.1:8000/api/voucher/",
+                        cache: false,
+                        success: function (data) {
+                            for (var i = 0; i < data.length; i++) {
+                                Vue.set(vm.vouchers, i, data[i])
+                            }
+
+                        }
+                    })
+                },
+                getHistory() {
+                    $.ajax({
+                        url: "http://127.0.0.1:8000/api/history/",
+                        cache: false,
+                        success: function (data) {
+                            for (var i = 0; i < data.length; i++) {
+                                Vue.set(vm.histories, i, data[i])
+                            }
+
+                        }
+                    })
+                },
+                getOrder() {
+                    var a = 0
+                    $.ajax({
+                        url: "http://127.0.0.1:8000/api/order/",
+                        cache: false,
+                        success: function (data) {
+                            for (var i = 0; i < data.length; i++) {
+                                this.stotal = this.stotal + data[i].price
+                                a = a + data[i].price
+                                Vue.set(vm.orders, i, data[i])
+                            }
+                            vm.fee = 25;
+                            vm.stotal = a;
+                            vm.gtotal = a + vm.fee;
+                        }
+                    })
+                },
+                postOrder(product) {
+                    $.post("http://127.0.0.1:8000/api/order/",
+                        {
+                            "title": product.title,
+                            "price": product.price
+                        },
+                        function (data, status) {
+                            alert("Added to cart")
+                            vm.getOrder()
+                        });
+                },
+
+                deleteOrder(order) {
+                    $.ajax({
+                        url: "http://127.0.0.1:8000/api/order/" + order.id + "/",
+                        type: 'DELETE',
+                        success: function (data) {
+                            vm.orders = []
+                            vm.getOrder()
+                        }
+                    });
+                },
+
+                deleteAllOrder() {
+                    $.get(
+                        "http://127.0.0.1:8000/api/order/delete_all/",
+                        function (data, status) {
+                            vm.orders = []
+                        }
+                    );
+                },
+
+                stageVoucher(voucher) {
+                    let data = { "id": voucher.id }
+                    $.ajax({
+                        url: 'http://127.0.0.1:8000/api/voucher/verify/',
+                        type: 'PUT',
+                        data: data,
+                        success: function (data) {
+                            alert(data.status)
+                            if (data.status == "verify") {
+                                if (voucher.vouchtype == "OFF") {
+                                    alert("Voucher Applied")
+                                    var temp = vm.stotal
+                                    vm.stotal = vm.stotal - (voucher.vouchvalue / 100) * temp
+                                    vm.gtotal = vm.gtotal - (voucher.vouchvalue / 100) * temp
+                                }
+                                else if (voucher.vouchtype == "FEE") {
+                                    alert("Voucher Applied")
+                                    vm.gtotal = vm.gtotal - vm.fee
+                                    vm.fee = 0
+                                }
+                            }
+                            else {
+                                alert("Voucher not valid")
+                            }
+                        }
+                    });
+                },
+
+                unstageVoucher() {
+                    $.get(
+                        "http://127.0.0.1:8000/api/voucher/unstage/",
+                        function (data, status) {
+                        }
+                    );
+                    this.getOrder()
+                },
+
+                submitOrder() {
+                    $.get(
+                        "http://127.0.0.1:8000/api/order/submit/",
+                        function (data, status) {
+                            vm.getVoucher()
+                            vm.getHistory()
+                            vm.orders = []
+                        }
+                    );
+                }
+
+            },
+            created() {
+                this.getProduct();
+                this.getVoucher();
+                this.getOrder();
+                this.unstageVoucher();
+                this.getHistory();
+            },
+            updated() {
+            },
+
+        })
+
+
+
+
+
+
+    </script>
+    <style scoped>
+        .container {
+            margin-top: 20px;
+        }
+
+        .card {
+            display: inline-block;
+            margin-right: 5px;
+        }
+    </style>
+</body>
+
+</html>
